@@ -1,6 +1,6 @@
 #![allow(nonstandard_style)]
 
-pub use std::ffi::{c_char, c_int, c_float};
+pub use core::ffi::{c_char, c_int, c_float};
 pub type size_t = usize;
 
 pub enum xm_context {}

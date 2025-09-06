@@ -35,8 +35,10 @@
 //! }
 //! ```
 
+#![cfg_attr(not(any(feature = "std", test)), no_std)]
+
 pub mod ffi;
-use std::mem;
+use core::mem;
 
 /// Possible errors from the `XMContext::new` method.
 #[derive(Copy, Clone, Debug)]
@@ -89,7 +91,7 @@ impl XMContext {
     /// * `rate` - The play rate in Hz. Recommended value is 48000.
     pub fn new(mod_data: &[u8], rate: u32) -> Result<XMContext, XMError> {
         unsafe {
-            let mut raw: *mut ffi::xm_context = std::ptr::null_mut();
+            let mut raw: *mut ffi::xm_context = core::ptr::null_mut();
 
             let mod_data_ptr = mem::transmute(mod_data.as_ptr());
             let mod_data_len = mod_data.len() as ffi::size_t;
@@ -148,7 +150,7 @@ impl XMContext {
             if name.is_null() {
                 None
             } else {
-                Some(std::ffi::CStr::from_ptr(name).to_bytes())
+                Some(core::ffi::CStr::from_ptr(name).to_bytes())
             }
         }
     }
@@ -164,7 +166,7 @@ impl XMContext {
             if name.is_null() {
                 None
             } else {
-                Some(std::ffi::CStr::from_ptr(name).to_bytes())
+                Some(core::ffi::CStr::from_ptr(name).to_bytes())
             }
         }
     }
