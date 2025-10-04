@@ -37,9 +37,12 @@
 
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 
-pub mod context;
 pub mod ffi;
 
+#[cfg(feature = "std")]
+pub mod context;
+
+#[cfg(feature = "std")]
 pub use context::{
     PlayingSpeed,
     Position,

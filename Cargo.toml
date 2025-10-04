@@ -14,12 +14,23 @@ build = "build.rs"
 edition = "2021"
 
 [build-dependencies]
-cc = "1.1"
+cmake = "0.1"
 
 [dev-dependencies]
 cpal = "0.15.3"
 getopts = "0.2"
 sdl2 = "0.37.0"
+
+[dependencies]
+static_assertions = "1.1.0"
+
+[[example]]
+name = "playback-cpal"
+required-features = ["std"]
+
+[[example]]
+name = "playback-sdl2"
+required-features = ["std"]
 
 [features]
 default = []

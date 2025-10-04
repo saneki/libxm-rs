@@ -44,7 +44,7 @@ fn play_audio(contents: &[u8], rate: u32, max_loops: u8) {
     };
 
     let device = AudioDevice::open_playback(&audio, None, &desired_spec, |spec| {
-        let mut xm = XMContext::new(&contents, spec.freq as u32).unwrap();
+        let mut xm = XMContext::new(&contents, spec.freq.try_into().unwrap()).unwrap();
         xm.set_max_loop_count(max_loops);
 
         if let Some(module_name) = xm.module_name() {

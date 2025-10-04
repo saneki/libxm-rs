@@ -1,4 +1,4 @@
-use cc;
+use cmake::Config;
 
 fn main() {
     fn parse_env(key: &str, default: bool) -> bool {
@@ -29,19 +29,11 @@ fn main() {
         Some(if value { "1" } else { "0" })
     }
 
-    cc::Build::new()
-        .file("libxm/src/context.c")
-        .file("libxm/src/load.c")
-        .file("libxm/src/play.c")
-        .file("libxm/src/xm.c")
-        .include("libxm/include")
-        .define("XM_DEFENSIVE", on_off(defensive))
-        .define("XM_STRINGS", on_off(strings))
-        .define("XM_LIBXMIZE_DELTA_SAMPLES", on_off(libxmize_delta_samples))
-        .define("XM_LINEAR_INTERPOLATION", on_off(linear_interpolation))
-        .define("XM_RAMPING", on_off(ramping))
-        .define("XM_DEBUG", on_off(debug))
-        .define("XM_BIG_ENDIAN", on_off(big_endian))
-        .flag("--std=c11")
-        .compile("libxm.a");
+    let mut config = Config::new("libxm/src");
+    config.build_target("xm")
+        .define("XM_VERBOSE", "0");
+    let dst = config.build();
+    let profile = config.get_profile();
+    println!("cargo:rustc-link-search=native={}/build/{profile}", dst.display());
+    println!("cargo:rustc-link-lib=static=xm");
 }

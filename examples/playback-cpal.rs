@@ -31,7 +31,7 @@ impl MyCallback {
     }
 }
 
-fn play_audio(contents: &[u8], rate: u32, max_loops: u8) {
+fn play_audio(contents: &[u8], rate: u16, max_loops: u8) {
     use std::sync::mpsc::channel;
 
     let (loop_tx, loop_rx) = channel();
@@ -54,7 +54,7 @@ fn play_audio(contents: &[u8], rate: u32, max_loops: u8) {
     let device = host.default_output_device().unwrap();
     let config = StreamConfig {
         channels: 2,
-        sample_rate: cpal::SampleRate(rate),
+        sample_rate: cpal::SampleRate(rate as u32),
         buffer_size: cpal::BufferSize::Default
     };
 

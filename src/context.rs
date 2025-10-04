@@ -1,4 +1,6 @@
-use core::mem;
+use std::boxed::Box;
+use std::mem;
+use std::pin::Pin;
 use crate::ffi;
 
 /// Possible errors from the `XMContext::new` method.
@@ -18,9 +20,9 @@ pub enum XMError {
 #[derive(Copy, Clone)]
 pub struct PlayingSpeed {
     /// Beats per minute
-    pub bpm: u16,
+    pub bpm: u8,
     /// Ticks per line
-    pub tempo: u16
+    pub tempo: u8
 }
 
 /// The return values from `XMContext::get_position()`.
@@ -33,12 +35,13 @@ pub struct Position {
     /// Row number
     pub row: u8,
     /// Total number of generated samples
-    pub samples: u64
+    pub samples: u32
 }
 
 /// The XM context.
 pub struct XMContext {
-    raw: *mut ffi::xm_context_t
+    raw: *mut ffi::xm_context_t,
+    _pool: Pin<Box<[u8]>>,
 }
 
 unsafe impl Send for XMContext {}
@@ -50,22 +53,29 @@ impl XMContext {
     /// # Parameters
     /// * `mod_data` - The contents of the module.
     /// * `rate` - The play rate in Hz. Recommended value is 48000.
-    pub fn new(mod_data: &[u8], rate: u32) -> Result<XMContext, XMError> {
+    pub fn new(mod_data: &[u8], rate: u16) -> Result<XMContext, XMError> {
         unsafe {
-            let mut raw: *mut ffi::xm_context = core::ptr::null_mut();
-
             let mod_data_ptr = mem::transmute(mod_data.as_ptr());
-            let mod_data_len = mod_data.len() as ffi::size_t;
+            let mod_data_len: u32 = mod_data.len().try_into().unwrap();
 
-            let result = ffi::xm_create_context_safe(&mut raw, mod_data_ptr, mod_data_len, rate);
-            match result {
-                0 => Ok(XMContext {
-                    raw: raw
-                }),
-                1 => Err(XMError::ModuleDataNotSane),
-                2 => Err(XMError::MemoryAllocationFailed),
-                _ => Err(XMError::Unknown(result))
+            // TODO: May be able to make MaybeUninit.
+            let mut prescan: ffi::xm_prescan_data_t = Default::default();
+            if !ffi::xm_prescan_module(mod_data_ptr, mod_data_len, &mut prescan) {
+                return Err(XMError::ModuleDataNotSane)
             }
+            let context_size = ffi::xm_size_for_context(&prescan);
+            let mut pool = Pin::new(vec![0u8; context_size as usize].into_boxed_slice());
+            let raw = ffi::xm_create_context(pool.as_mut_ptr(), &prescan, mod_data_ptr, mod_data_len);
+            if raw.is_null() {
+                return Err(XMError::Unknown(0))
+            }
+
+            ffi::xm_set_sample_rate(raw, rate);
+
+            Ok(XMContext {
+                raw: raw,
+                _pool: pool,
+            })
         }
     }
 
@@ -77,7 +87,7 @@ impl XMContext {
             // Output buffer must have a multiple-of-two length.
             assert!(output.len() % 2 == 0);
 
-            let output_len = (output.len() / 2) as ffi::size_t;
+            let output_len: u16 = (output.len() / 2).try_into().unwrap();
             ffi::xm_generate_samples(self.raw, output.as_mut_ptr(), output_len);
         }
     }
@@ -134,7 +144,7 @@ impl XMContext {
 
     /// Gets the number of channels.
     #[inline]
-    pub fn number_of_channels(&self) -> u16 {
+    pub fn number_of_channels(&self) -> u8 {
         unsafe { ffi::xm_get_number_of_channels(self.raw) }
     }
 
@@ -163,7 +173,7 @@ impl XMContext {
 
     /// Gets the number of instruments.
     #[inline]
-    pub fn number_of_instruments(&self) -> u16 {
+    pub fn number_of_instruments(&self) -> u8 {
         unsafe { ffi::xm_get_number_of_instruments(self.raw) }
     }
 
@@ -172,7 +182,7 @@ impl XMContext {
     /// # Note
     /// Instrument numbers go from `1` to `get_number_of_instruments()`
     #[inline]
-    pub fn number_of_samples(&self, instrument: u16) -> u16 {
+    pub fn number_of_samples(&self, instrument: u8) -> u8 {
         assert!(instrument >= 1);
         assert!(instrument <= self.number_of_instruments());
 
@@ -212,7 +222,7 @@ impl XMContext {
     /// # Note
     /// Instrument numbers go from `1` to `get_number_of_instruments()`
     #[inline]
-    pub fn latest_trigger_of_instrument(&self, instrument: u16) -> u64 {
+    pub fn latest_trigger_of_instrument(&self, instrument: u8) -> u32 {
         assert!(instrument >= 1);
         assert!(instrument <= self.number_of_instruments());
 
@@ -227,7 +237,7 @@ impl XMContext {
     ///
     /// Sample numbers go from `0` to `get_number_of_samples(instrument) - 1`
     #[inline]
-    pub fn latest_trigger_of_sample(&self, instrument: u16, sample: u16) -> u64 {
+    pub fn latest_trigger_of_sample(&self, instrument: u8, sample: u8) -> u32 {
         assert!(instrument >= 1);
         assert!(instrument <= self.number_of_instruments());
         assert!(sample < self.number_of_samples(instrument));
@@ -241,18 +251,10 @@ impl XMContext {
     /// # Note
     /// Channel numbers go from `1` to `get_number_of_channels()`
     #[inline]
-    pub fn latest_trigger_of_channel(&self, channel: u16) -> u64 {
+    pub fn latest_trigger_of_channel(&self, channel: u8) -> u32 {
         assert!(channel >= 1);
         assert!(channel <= self.number_of_channels());
 
         unsafe { ffi::xm_get_latest_trigger_of_channel(self.raw, channel) }
-    }
-}
-
-impl Drop for XMContext {
-    fn drop(&mut self) {
-        unsafe {
-            ffi::xm_free_context(self.raw);
-        }
     }
 }
