@@ -1,6 +1,5 @@
 use std::boxed::Box;
 use std::mem;
-use std::pin::Pin;
 use crate::ffi;
 
 /// Possible errors from the `XMContext::new` method.
@@ -41,7 +40,7 @@ pub struct Position {
 /// The XM context.
 pub struct XMContext {
     raw: *mut ffi::xm_context_t,
-    _pool: Pin<Box<[u8]>>,
+    _pool: Box<[u8]>,
 }
 
 unsafe impl Send for XMContext {}
@@ -64,7 +63,7 @@ impl XMContext {
                 return Err(XMError::ModuleDataNotSane)
             }
             let context_size = ffi::xm_size_for_context(&prescan);
-            let mut pool = Pin::new(vec![0u8; context_size as usize].into_boxed_slice());
+            let mut pool = vec![0u8; context_size as usize].into_boxed_slice();
             let raw = ffi::xm_create_context(pool.as_mut_ptr(), &prescan, mod_data_ptr, mod_data_len);
             if raw.is_null() {
                 return Err(XMError::Unknown(0))
